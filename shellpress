@@ -1,0 +1,21 @@
+#!/bin/bash
+# ShellPress
+
+echo '========================================'
+echo '|          Starting ShellPress         |'
+echo '========================================'
+
+
+RUN_DIR=$PWD
+
+echo ' - Creating temporary directory for install files'
+mkdir temp
+
+
+
+echo '========================================'
+echo '|           Begining Cleanup           |'
+echo '========================================'
+
+echo ' - Removing temporary directory for install files'
+rmdir temp
