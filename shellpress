@@ -285,7 +285,7 @@ require_once(ABSPATH . 'wp-settings.php');" >> wp-config.php
 #=============================================
 # 8 - Create Database
 #=============================================
-$MYSQL_COMMAND --user=$PROJECT_DB_USERNAME --password=$PROJECT_DB_PASSWORD --host=$PROJECT_DB_HOST --execute="CREATE DATABASE $PROJECT_DB_NAME;"
+$MYSQL_COMMAND --user=$PROJECT_DB_USERNAME --password=$PROJECT_DB_PASSWORD --host=$PROJECT_DB_HOST --execute="CREATE DATABASE \`$PROJECT_DB_NAME\`;"
 
 
 
