@@ -30,6 +30,7 @@ echo "${font_magenta}===========================================${font_reset}"
 
 
 
+
 #=============================================
 # 1 - Script Setup
 #=============================================
@@ -53,6 +54,22 @@ echo "${font_yellow}[LOADING]${font_reset} Congifuration Files"
 source ${BASEDIR}/shellpress.conf
 
 echo "${font_green}[COMPLETED]${font_reset} congifuration files loaded"
+
+
+
+
+
+echo "${font_yellow}[SETTING]${font_reset} MySQL"
+
+# Choose MYSQL path
+if [[ $global_mysql == true ]]; then
+	MYSQL_COMMAND="mysql"
+else
+	MYSQL_COMMAND="$path_to_mysql" 
+fi
+
+echo "${font_green}[COMPLETED]${font_reset} using $MYSQL_COMMAND"
+
 
 
 
@@ -265,6 +282,10 @@ require_once(ABSPATH . 'wp-settings.php');" >> wp-config.php
 
 
 
+#=============================================
+# 8 - Create Database
+#=============================================
+$MYSQL_COMMAND --user=$PROJECT_DB_USERNAME --password=$PROJECT_DB_PASSWORD --host=$PROJECT_DB_HOST --execute="CREATE DATABASE $PROJECT_DB_NAME;"
 
 
 
