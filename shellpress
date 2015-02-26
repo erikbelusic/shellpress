@@ -1,59 +1,228 @@
 #!/bin/bash
-# ShellPress
-
-# Args
-# $1 - project-name
-
-# Define Colors for output
-font_red=`tput setaf 1`
-font_green=`tput setaf 2`
-font_yellow=`tput setaf 3`
-font_blue=`tput setaf 4`
-font_magenta=`tput setaf 5`
-font_cyan=`tput setaf 6`
-font_reset=`tput sgr0`
-font_bold=`tput bold`
+#
+# Script Name:   ShellPress
+# Script URI:    https://github.com/erikbelusic/shellpress
+# Author:        Erik Belusic
+# Author URI:    http://erikbelusic.com
+# Author github: https://github.com/erikbelusic
+# Description:   This script will help get wordpress set up, quickly so you can
+#                get right to development. Currently it targets local setups
+#                with MAMP or similar solutiion.
+# Version:       0.1.0
+# License:       TBD
+# License URI:
 
 
 
 
+################################################################################
+# Constant Definitions
+################################################################################
 
-# Fancy Intro
-echo "${font_magenta}${font_bold}===========================================${font_cyan}"
-echo " __ _          _ _   ___                   "
-echo "/ _\ |__   ___| | | / _ \_ __ ___  ___ ___ "
-echo "\ \| '_ \ / _ \ | |/ /_)/ '__/ _ \/ __/ __|"
-echo "_\ \ | | |  __/ | / ___/| | |  __/\__ \__ \\"
-echo "\__/_| |_|\___|_|_\/    |_|  \___||___/___/"
-echo "${font_magenta}===========================================${font_reset}"
-
-
-
-
-
-#=============================================
-# 1 - Script Setup
-#=============================================
-echo "${font_yellow}[INITIALIZING]${font_reset}"
 
 # Get the location of shellpress
-BASEDIR=$(dirname $0)
+readonly BASEDIR=$(dirname $0)
 
 # Get the users working directory
-RUN_DIR=$PWD
-
-echo "${font_green}[COMPLETED]${font_reset} Initializing"
+readonly RUN_DIR=$PWD
 
 
 
 
+################################################################################
+# Variable Definitions
+################################################################################
 
-echo "${font_yellow}[LOADING]${font_reset} Congifuration Files"
 
 # Import Configuration File
+########################################
 source ${BASEDIR}/shellpress.conf
 
-echo "${font_green}[COMPLETED]${font_reset} congifuration files loaded"
+# Self Reference imported variables
+########################################
+default_db_host="${default_db_host}"
+default_db_username="${default_db_username}"
+default_db_password="${default_db_password}"
+global_mysql="${global_mysql}"
+path_to_mysql="${path_to_mysql}"
+
+# Define Symbols
+########################################
+symbol_check="✔" # check mark for affirmatives
+symbol_cross="✘" # cross mark for negatives
+
+
+# Installation check variables
+########################################
+curl_installed="false"
+tar_installed="false"
+global_mysql_installed="false"
+specified_mysql_installed="false"
+required_installed="false"
+
+
+
+
+################################################################################
+# Function Definitions
+################################################################################
+
+
+########################################
+# Pipe an echo to me!
+# Will string in a selected color
+# Globals:
+#   None
+# Arguments:
+#   ${1} [red][green][yellow][blue],
+#		 [magenta][cyan]
+#	${2} [bold]
+# Returns:
+#   None
+# Examples:
+#	echo "I will be red" | colorize red
+#	echo "I will be bold blue" | colorize red bold
+########################################
+colorize(){
+	if [[ ($# -ne 1) && ($# -ne 2) ]]; then
+		cat
+		return
+	fi
+
+	local red=`tput setaf 1`
+	local green=`tput setaf 2`
+	local yellow=`tput setaf 3`
+	local blue=`tput setaf 4`
+	local magenta=`tput setaf 5`
+	local cyan=`tput setaf 6`
+	local reset=`tput sgr0`
+	local bold=""
+	local color=\$${1:-reset}
+	if [[ "${2}" == "bold" ]]; then
+		bold=`tput bold`
+	fi
+	# Activate color passed as argument
+	echo -ne "`eval echo ${color}${bold}`"
+	# Read stdin (pipe) and print from it
+	cat
+	# Reset back to normal
+	echo -ne "${reset}"
+}
+
+
+########################################
+# Checks if cli program is exists
+# echo "found" if global command line program installed, else missing
+# Globals:
+#   None
+# Arguments:
+#   ${1} string - cli program name
+# Returns:
+#   None
+# Example:
+#	echo "node: $(program_is_installed node)"
+########################################
+program_is_installed() {
+  # set to 1 initially
+  local return_="true"
+  # set to 0 if not found
+  type $1 >/dev/null 2>&1 || { local return_="false"; }
+  # return value
+  echo "$return_"
+}
+
+
+########################################
+# Echos opening logo
+# Globals:
+#   colorize()
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_ascii_display() {
+	echo "===========================================" | colorize magenta bold
+	echo " __ _          _ _   ___                   " | colorize cyan bold
+	echo "/ _\ |__   ___| | | / _ \_ __ ___  ___ ___ " | colorize cyan bold
+	echo "\ \| '_ \ / _ \ | |/ /_)/ '__/ _ \/ __/ __|" | colorize cyan bold
+	echo "_\ \ | | |  __/ | / ___/| | |  __/\__ \__ \\" | colorize cyan bold
+	echo "\__/_| |_|\___|_|_\/    |_|  \___||___/___/" | colorize cyan bold
+	echo "===========================================" | colorize magenta bold
+}
+
+
+########################################
+# Checks for require programs for basic
+# install
+# Globals:
+#   program_is_installed()
+#	colorize()
+#	symbol_check
+#	symbol_cross
+# Arguments:
+#   ${1} program name
+# Returns:
+#   None
+########################################
+shellpress_check_required() {
+	
+	echo "checking for required programs" | colorize yellow
+	
+	curl_installed=$(program_is_installed curl)
+	tar_installed=$(program_is_installed tar)
+	global_mysql_installed=$(program_is_installed mysql)
+	specified_mysql_installed=$(program_is_installed ${path_to_mysql})
+
+	echo -n "curl: "
+	if [[ "${curl_installed}" == true ]]; then
+		echo "found ${symbol_check}" | colorize green
+	else
+		echo "missing ${symbol_cross}" | colorize red
+	fi
+	
+	echo -n "tar: "
+	if [[ "${tar_installed}" == true ]]; then
+		echo "found ${symbol_check}" | colorize green
+	else
+		echo "missing ${symbol_cross}" | colorize red
+	fi
+
+	echo -n "global mysql: "
+	if [[ "${global_mysql_installed}" == true ]]; then
+		echo "found ${symbol_check}" | colorize green
+	else
+		echo "missing ${symbol_cross}" | colorize red
+	fi
+
+	echo -n "specified mysql: "
+	if [[ "${specified_mysql_installed}" == true ]]; then
+		echo "found ${symbol_check}" | colorize green
+	else
+		echo "missing ${symbol_cross}" | colorize red
+	fi
+
+	if [[ ("${curl_installed}" == "true") && ("${tar_installed}" == "true") ]]; then
+		echo "we have curl and tar"
+	fi
+}
+
+shellpress_check_required
+exit
+
+
+
+echo "${symbol_cross}" | colorize red
+echo "${symbol_cross}" | colorize orange
+echo "${symbol_cross}" | colorize 
+echo "${symbol_check}" | colorize green
+echo "${BASEDIR}"
+echo "${RUN_DIR}"
+
+
+exit
+
+
 
 
 
