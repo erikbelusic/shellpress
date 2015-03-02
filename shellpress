@@ -60,7 +60,15 @@ global_mysql_installed="false"
 specified_mysql_installed="false"
 required_installed="false"
 
-
+# Project specific variables
+########################################
+mysql_command="mysql"
+project_name=""
+project_db_host=""
+project_db_username=""
+project_db_password=""
+project_table_prefix=""
+default_table_prefix=""
 
 
 ################################################################################
@@ -101,11 +109,17 @@ colorize(){
 	if [[ "${2}" == "bold" ]]; then
 		bold=`tput bold`
 	fi
+
 	# Activate color passed as argument
+	########################################
 	echo -ne "`eval echo ${color}${bold}`"
+
 	# Read stdin (pipe) and print from it
+	########################################
 	cat
+
 	# Reset back to normal
+	########################################
 	echo -ne "${reset}"
 }
 
@@ -123,11 +137,17 @@ colorize(){
 #	echo "node: $(program_is_installed node)"
 ########################################
 program_is_installed() {
+  
   # set to 1 initially
+  ########################################
   local return_="true"
+
   # set to 0 if not found
+  ########################################
   type $1 >/dev/null 2>&1 || { local return_="false"; }
+  
   # return value
+  ########################################
   echo "$return_"
 }
 
@@ -174,288 +194,410 @@ shellpress_check_required() {
 	global_mysql_installed=$(program_is_installed mysql)
 	specified_mysql_installed=$(program_is_installed ${path_to_mysql})
 
-	echo -n "curl: "
-	if [[ "${curl_installed}" == true ]]; then
-		echo "found ${symbol_check}" | colorize green
+	if [[ "${curl_installed}" == "true" ]]; then
+		echo -n "${symbol_check} found " | colorize green
 	else
-		echo "missing ${symbol_cross}" | colorize red
+		echo -n "${symbol_cross} missing " | colorize red
 	fi
+	echo "curl"
 	
-	echo -n "tar: "
-	if [[ "${tar_installed}" == true ]]; then
-		echo "found ${symbol_check}" | colorize green
+	if [[ "${tar_installed}" == "true" ]]; then
+		echo -n "${symbol_check} found " | colorize green
 	else
-		echo "missing ${symbol_cross}" | colorize red
+		echo -n "${symbol_cross} missing " | colorize red
 	fi
+	echo "tar"
 
-	echo -n "global mysql: "
-	if [[ "${global_mysql_installed}" == true ]]; then
-		echo "found ${symbol_check}" | colorize green
+	if [[ "${global_mysql_installed}" == "true" ]]; then
+		echo -n "${symbol_check} found " | colorize green
 	else
-		echo "missing ${symbol_cross}" | colorize red
+		echo -n "${symbol_cross} missing " | colorize red
 	fi
+	echo "global mysql"
 
-	echo -n "specified mysql: "
-	if [[ "${specified_mysql_installed}" == true ]]; then
-		echo "found ${symbol_check}" | colorize green
+	if [[ "${specified_mysql_installed}" == "true" ]]; then
+		echo -n "${symbol_check} found " | colorize green
 	else
-		echo "missing ${symbol_cross}" | colorize red
+		echo -n "${symbol_cross} missing " | colorize red
 	fi
+	echo "specified mysql at '${path_to_mysql}'"
 
-	if [[ ("${curl_installed}" == "true") && ("${tar_installed}" == "true") ]]; then
-		echo "we have curl and tar"
+	if [[ ("${curl_installed}" == "true") && ("${tar_installed}" == "true") && (("${global_mysql_installed}" == "true") || ("${specified_mysql_installed}" == "true")) ]]; then
+		required_installed="true"
+		echo "${symbol_check} Requirements met!" | colorize green
+	else
+		echo "${symbol_cross} Requirements not met" | colorize red
+		exit
 	fi
 }
 
-shellpress_check_required
-exit
+
+########################################
+# Sets the mysql command to the correct
+# binary
+# Globals:
+#	colorize()
+#   global_mysql
+#	path_to_mysql
+#	mysql_command
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_mysql_setup() {
+
+	# Check which MySQL the user specified in config
+	# Make sure it is installed
+	# Set the mysql_command to use
+	########################################
+	if [[ "${global_mysql}" == "true" ]]; then
+		echo "Setting mysql_command to use 'mysql'" | colorize yellow
+		if [[  "${global_mysql_installed}" == "true" ]]; then
+			mysql_command="mysql"
+			echo "${symbol_check} mysql_command successfully set to 'mysql'" | colorize green
+		else
+			echo "${symbol_cross} mysql_command was unable to be set to 'mysql'" | colorize red
+			echo "Check if mysql is installed and can be run using 'mysql'" | colorize red
+			exit
+		fi
+	else
+		echo "Setting mysql_command to use '${path_to_mysql}'" | colorize yellow
+		if [[  "${specified_mysql_installed}" == "true" ]]; then
+			mysql_command="${path_to_mysql}"
+			echo "${symbol_check} mysql_command successfully set to '${path_to_mysql}'" | colorize green
+		else
+			echo "${symbol_cross} mysql_command was unable to be set to '${path_to_mysql}'" | colorize red
+			echo "Check if mysql is installed and can be run using '${path_to_mysql}'" | colorize red
+			exit
+		fi
+	fi
+}
 
 
+########################################
+# Sets up project directory
+# Globals:
+#	colorize()
+#   project_name
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_directory_setup() {
 
-echo "${symbol_cross}" | colorize red
-echo "${symbol_cross}" | colorize orange
-echo "${symbol_cross}" | colorize 
-echo "${symbol_check}" | colorize green
-echo "${BASEDIR}"
-echo "${RUN_DIR}"
-
-
-exit
-
-
-
-
-
-
-
-echo "${font_yellow}[SETTING]${font_reset} MySQL"
-
-# Choose MYSQL path
-if [[ $global_mysql == true ]]; then
-	MYSQL_COMMAND="mysql"
-else
-	MYSQL_COMMAND="$path_to_mysql" 
-fi
-
-echo "${font_green}[COMPLETED]${font_reset} using $MYSQL_COMMAND"
-
-
-
-
-
-#=============================================
-# 2 - Directory Setup
-#=============================================
-# Check if an argument was passed
-if [[ $1 ]] ; then
-	# Save argument as the project name
-	PROJECT_NAME=$1
-else
 	# Ask the user for the project name
-	while [[ $PROJECT_NAME == "" ]]; do
-		read -p "${font_cyan}[PROMPT]${font_reset} Enter Project Name: " PROJECT_NAME
+	########################################
+	echo "Begining project set up"
+	while [[ $project_name == "" ]]; do
+		echo -n "[PROMPT] " | colorize cyan
+		echo -n "Enter Project Name: "
+		read project_name
 	done
-fi
-
-
-
-
-
-echo "${font_yellow}[CREATING]${font_reset} project directory"
-
-# Create directory at current location with project name
-mkdir $PROJECT_NAME
-
-echo "${font_green}[COMPLETED]${font_reset} created $PROJECT_NAME at path ${RUN_DIR}/${PROJECT_NAME}"
-
-
-
-
-
-echo "${font_yellow}[CHANGING]${font_reset} into new project directory"
-
-# Chang directory to the one we just created
-cd $PROJECT_NAME
-
-echo "${font_green}[COMPLETED]${font_reset} changed directory to ${RUN_DIR}/${PROJECT_NAME}"
-
-
-
-
-#=============================================
-# 3 - Download
-#=============================================
-echo "${font_yellow}[DOWNLOADING]${font_reset} latest release version of WordPress via https://wordpress.org/latest.tar.gz"
-
-# Download wordpress
-curl -O https://wordpress.org/latest.tar.gz
-
-echo "${font_green}[COMPLETED]${font_reset} downloaded latest release version of WordPress"
-
-
-
-
-#=============================================
-# 4 - Extract
-#=============================================
-echo "${font_yellow}[EXTRACTING]${font_reset} WordPress"
-
-# Extract WordPress
-tar xfz latest.tar.gz
-
-echo "${font_green}[COMPLETED]${font_reset} extracted WordPress"
-
-
-
-
-#=============================================
-# 5 - Move
-#=============================================
-echo "${font_yellow}[MOVING]${font_reset} WordPress to ${RUN_DIR}/${PROJECT_NAME}"
-
-# Move WordPress files to project directory
-mv wordpress/* ./
-
-echo "${font_green}[COMPLETED]${font_reset} moved WordPress to ${RUN_DIR}/${PROJECT_NAME}"
-
-
-
-#=============================================
-# 6 - Store Config Info
-#=============================================
-# Prompt for db host
-read -p "${font_cyan}[PROMPT]${font_reset} Enter Database Host: ${font_magenta}[${default_db_host}]${font_reset} " PROJECT_DB_HOST
-if [[ $PROJECT_DB_HOST == "" ]]; then
-	PROJECT_DB_HOST=$default_db_host
-fi
-
-
-
-
-# Prompt for db username
-read -p "${font_cyan}[PROMPT]${font_reset} Enter Database Username: ${font_magenta}[${default_db_username}]${font_reset} " PROJECT_DB_USERNAME
-if [[ $PROJECT_DB_USERNAME == "" ]]; then
-	PROJECT_DB_USERNAME=$default_db_username
-fi
-
-
-
-
-# Prompt for db password
-read -p "${font_cyan}[PROMPT]${font_reset} Enter Database Password: ${font_magenta}[${default_db_password}]${font_reset} " PROJECT_DB_PASSWORD
-if [[ $PROJECT_DB_PASSWORD == "" ]]; then
-	PROJECT_DB_PASSWORD=$default_db_password
-fi
-
-
-
-
-# Prompt for db name
-read -p "${font_cyan}[PROMPT]${font_reset} Enter Database Name: ${font_magenta}[${PROJECT_NAME}]${font_reset} " PROJECT_DB_NAME
-if [[ $PROJECT_DB_NAME == "" ]]; then
-	PROJECT_DB_NAME=$PROJECT_NAME
-fi
-
-
-
-
-# Random prefix
-default_table_prefix="sp_"$(date +%s | md5 | head -c 6)"_"
-# Prompt for table prefix
-read -p "${font_cyan}[PROMPT]${font_reset} Enter Table Prefix: ${font_magenta}[${default_table_prefix}]${font_reset} " PROJECT_TABLE_PREFIX
-if [[ $PROJECT_TABLE_PREFIX == "" ]]; then
-	PROJECT_TABLE_PREFIX=$default_table_prefix
-fi
-
-
-
-
-
-#=============================================
-# 7 - Create Custom wp-config.php file
-#=============================================
-echo "<?php
-/**
- * The base configurations of the WordPress.
- *
- * This file has the following configurations: MySQL settings, Table Prefix,
- * Secret Keys, WordPress Language, and ABSPATH. You can find more information
- * by visiting {@link http://codex.wordpress.org/Editing_wp-config.php Editing
- * wp-config.php} Codex page. You can get the MySQL settings from your web host.
- *
- * This file is used by the wp-config.php creation script during the
- * installation. You don't have to use the web site, you can just copy this file
- * to \"wp-config.php\" and fill in the values.
- *
- * @package WordPress
- */
-// ** MySQL settings - You can get this info from your web host ** //
-/** The name of the database for WordPress */
-define('DB_NAME', '${PROJECT_DB_NAME}');
-/** MySQL database username */
-define('DB_USER', '${PROJECT_DB_USERNAME}');
-/** MySQL database password */
-define('DB_PASSWORD', '${PROJECT_DB_PASSWORD}');
-/** MySQL hostname */
-define('DB_HOST', '${PROJECT_DB_HOST}');
-/** Database Charset to use in creating database tables. */
-define('DB_CHARSET', 'utf8');
-/** The Database Collate type. Don't change this if in doubt. */
-define('DB_COLLATE', '');
-/**#@+
- * Authentication Unique Keys and Salts.
- *
- * Change these to different unique phrases!
- * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
- * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
- *
- * @since 2.6.0
- */" > wp-config.php
-
-curl https://api.wordpress.org/secret-key/1.1/salt/ > salts.txt
-cat salts.txt >> wp-config.php
-
-echo "/**#@-*/
-/**
- * WordPress Database Table prefix.
- *
- * You can have multiple installations in one database if you give each a unique
- * prefix. Only numbers, letters, and underscores please!
- */
-\$table_prefix  = '${PROJECT_TABLE_PREFIX}';
-/**
- * WordPress Localized Language, defaults to English.
- *
- * Change this to localize WordPress.  A corresponding MO file for the chosen
- * language must be installed to wp-content/languages. For example, install
- * de.mo to wp-content/languages and set WPLANG to 'de' to enable German
- * language support.
- */
-define ('WPLANG', '');
-/**
- * For developers: WordPress debugging mode.
- *
- * Change this to true to enable the display of notices during development.
- * It is strongly recommended that plugin and theme developers use WP_DEBUG
- * in their development environments.
- */
-define('WP_DEBUG', false);
-/* That's all, stop editing! Happy blogging. */
-/** Absolute path to the WordPress directory. */
-if ( !defined('ABSPATH') )
-	define('ABSPATH', dirname(__FILE__) . '/');
-/** Sets up WordPress vars and included files. */
-require_once(ABSPATH . 'wp-settings.php');" >> wp-config.php
-
-
-
-
-
-#=============================================
-# 8 - Create Database
-#=============================================
-$MYSQL_COMMAND --user=$PROJECT_DB_USERNAME --password=$PROJECT_DB_PASSWORD --host=$PROJECT_DB_HOST --execute="CREATE DATABASE \`$PROJECT_DB_NAME\`;"
-
+	
+	# Create directory at current location with project name
+	########################################
+	echo "Creating project directory" | colorize yellow
+	mkdir $project_name
+	echo "${symbol_check} Created project directory ${project_name} at path ${RUN_DIR}/${project_name}" | colorize green
+
+	# Chang directory to the one we just created
+	########################################
+	echo "Changing into project directory" | colorize yellow
+	cd $project_name
+	echo "${symbol_check} Directory changed to ${project_name} at path ${RUN_DIR}/${project_name}" | colorize green
+}
+
+
+########################################
+# Downloads latest stable WordPress and
+# move it into project directory
+# Globals:
+#	colorize()
+#   project_name
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_wordpress_download() {
+
+	# Download wordpress
+	########################################
+	echo "Downloading latest release version of WordPress via https://wordpress.org/latest.tar.gz" | colorize yellow
+	curl -O https://wordpress.org/latest.tar.gz
+	echo "${symbol_check} Completed downloading latest release version of WordPress" | colorize green
+
+	# Extract WordPress
+	########################################
+	echo "Extracting WordPress" | colorize yellow
+	tar xfz latest.tar.gz
+	echo "${symbol_check} Completed extracting WordPress" | colorize green
+
+	# Move WordPress files to project directory
+	########################################
+	echo "Moving WordPress to ${RUN_DIR}/${PROJECT_NAME}" | colorize yellow
+	mv wordpress/* ./
+	echo "${symbol_check} Completed moving WordPress to ${RUN_DIR}/${PROJECT_NAME}" | colorize green
+
+	# Remove empty wordpress folder
+	########################################
+	echo "Removing empty wordpress folder" | colorize yellow
+	rmdir ./wordpress/
+	echo "${symbol_check} Completed removing empty wordpress folder" | colorize green
+
+	# Remove wordpress
+	########################################
+	echo "Removing latest.tar.gz" | colorize yellow
+	rm -f latest.tar.gz
+	echo "${symbol_check} Completed removing latest.tar.gz" | colorize green
+}
+
+
+########################################
+# Requests database config info from
+# user, else uses defaults
+# Globals:
+#	colorize()
+#   default_db_host
+#	default_db_username
+#	default_db_password
+#	default_table_prefix
+#	project_name
+#	project_db_host
+#	project_db_username
+#	project_db_password
+#	project_db_name
+#	project_table_prefix
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_wordpress_database_setup() {
+
+	# Prompt for db host else set to default
+	########################################
+	echo -n "[PROMPT]" | colorize cyan
+	echo -n "Enter Database Host: "
+	echo -n "[${default_db_host}]" | colorize magenta
+	read project_db_host
+	if [[ "${project_db_host}" == "" ]]; then
+		project_db_host="${default_db_host}"
+	fi
+
+	# Prompt for db username else set to default
+	########################################
+	echo -n "[PROMPT]" | colorize cyan
+	echo -n "Enter Database Username: "
+	echo -n "[${default_db_username}]" | colorize magenta
+	read project_db_username
+	if [[ "${project_db_username}" == "" ]]; then
+		project_db_username="${default_db_username}"
+	fi
+
+	# Prompt for db password else set to default
+	########################################
+	echo -n "[PROMPT]" | colorize cyan
+	echo -n "Enter Database Password: "
+	echo -n "[${default_db_password}]" | colorize magenta
+	read project_db_password
+	if [[ "${project_db_password}" == "" ]]; then
+		project_db_password="${default_db_password}"
+	fi
+
+	# Prompt for db name else set to project name
+	########################################
+	echo -n "[PROMPT]" | colorize cyan
+	echo -n "Enter Database Name: "
+	echo -n "[${project_name}]" | colorize magenta
+	read project_db_name
+	if [[ "${project_db_name}" == "" ]]; then
+		project_db_name="${project_name}"
+	fi
+
+	# Generate random prefix for default
+	########################################
+	default_table_prefix="sp_"$(date +%s | md5 | head -c 6)"_"
+
+	# Prompt for table prefix
+	########################################
+	echo -n "[PROMPT]" | colorize cyan
+	echo -n "Enter Tablee Prefix: "
+	echo -n "[${default_table_prefix}]" | colorize magenta
+	read project_table_prefix
+	if [[ "${project_table_prefix}" == "" ]]; then
+		default_table_prefix="${default_table_prefix}"
+	fi
+
+	# Create Database
+	########################################
+	echo "Creating database '${project_db_name}'" | colorize yellow
+	$mysql_command --user=$project_db_username --password=$project_db_password --host=$project_db_host --execute="CREATE DATABASE \`$project_db_name\`;"
+	echo "${symbol_check} Completed creating database '${project_db_name}'" | colorize green
+}
+
+
+########################################
+# Creates custom wp-config.php file
+# with config info from user
+# Globals:
+#	colorize()
+#	project_db_host
+#	project_db_username
+#	project_db_password
+#	project_db_name
+#	project_table_prefix
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_wordpress_config_creation() {
+
+	# Download random salts
+	########################################
+	echo "Downloading random salts via https://api.wordpress.org/secret-key/1.1/salt/" | colorize yellow
+	curl https://api.wordpress.org/secret-key/1.1/salt/ > salts.txt
+	echo "${symbol_check} Completed downloading random salts via https://api.wordpress.org/secret-key/1.1/salt/" | colorize green
+
+	# Begin creating wp-config file
+	########################################
+	echo "Generating first part of wp-config.php" | colorize yellow
+	echo "<?php
+	/**
+	 * The base configurations of the WordPress.
+	 *
+	 * This file has the following configurations: MySQL settings, Table Prefix,
+	 * Secret Keys, WordPress Language, and ABSPATH. You can find more information
+	 * by visiting {@link http://codex.wordpress.org/Editing_wp-config.php Editing
+	 * wp-config.php} Codex page. You can get the MySQL settings from your web host.
+	 *
+	 * This file is used by the wp-config.php creation script during the
+	 * installation. You don't have to use the web site, you can just copy this file
+	 * to \"wp-config.php\" and fill in the values.
+	 *
+	 * @package WordPress
+	 */
+	// ** MySQL settings - You can get this info from your web host ** //
+	/** The name of the database for WordPress */
+	define('DB_NAME', '${project_db_name}');
+	/** MySQL database username */
+	define('DB_USER', '${project_db_username}');
+	/** MySQL database password */
+	define('DB_PASSWORD', '${project_db_password}');
+	/** MySQL hostname */
+	define('DB_HOST', '${project_db_host}');
+	/** Database Charset to use in creating database tables. */
+	define('DB_CHARSET', 'utf8');
+	/** The Database Collate type. Don't change this if in doubt. */
+	define('DB_COLLATE', '');
+	/**#@+
+	 * Authentication Unique Keys and Salts.
+	 *
+	 * Change these to different unique phrases!
+	 * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+	 * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+	 *
+	 * @since 2.6.0
+	 */" > wp-config.php
+
+	# Insert random salts
+	########################################
+	echo "Insert random salts into wp-config.php" | colorize yellow
+	cat salts.txt >> wp-config.php
+
+	# Finish creating wp-config
+	########################################
+	echo "Finishing gneration of wp-config.php" | colorize yellow
+	echo "/**#@-*/
+	/**
+	 * WordPress Database Table prefix.
+	 *
+	 * You can have multiple installations in one database if you give each a unique
+	 * prefix. Only numbers, letters, and underscores please!
+	 */
+	\$table_prefix  = '${PROJECT_TABLE_PREFIX}';
+	/**
+	 * WordPress Localized Language, defaults to English.
+	 *
+	 * Change this to localize WordPress.  A corresponding MO file for the chosen
+	 * language must be installed to wp-content/languages. For example, install
+	 * de.mo to wp-content/languages and set WPLANG to 'de' to enable German
+	 * language support.
+	 */
+	define ('WPLANG', '');
+	/**
+	 * For developers: WordPress debugging mode.
+	 *
+	 * Change this to true to enable the display of notices during development.
+	 * It is strongly recommended that plugin and theme developers use WP_DEBUG
+	 * in their development environments.
+	 */
+	define('WP_DEBUG', false);
+	/* That's all, stop editing! Happy blogging. */
+	/** Absolute path to the WordPress directory. */
+	if ( !defined('ABSPATH') )
+		define('ABSPATH', dirname(__FILE__) . '/');
+	/** Sets up WordPress vars and included files. */
+	require_once(ABSPATH . 'wp-settings.php');" >> wp-config.php
+	echo "${symbol_check} completed generating wp-config.php" | colorize green
+
+	# Remove temporary salts file
+	#
+	echo "Removing temporary salts file" | colorize yellow
+	rm salts.txt
+	echo "${symbol_check} completed removing temporary salts file" | colorize green
+}
+
+
+########################################
+# Exit script - confirm completion
+# Globals:
+#	colorize()
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+shellpress_complete() {
+	echo "****************************************"
+	echo -n "ShellPress " | colorize blue
+	echo -n "setup " | colorize magenta
+	echo -n "complete." | colorize green
+}
+
+
+########################################
+# The main program function
+# Globals:
+#	shellpress_ascii_display
+#	shellpress_check_required
+#	shellpress_mysql_setup
+#	shellpress_directory_setup
+#	shellpress_wordpress_download
+#	shellpress_wordpress_database_setup
+#	shellpress_wordpress_config_creation
+#	shellpress_complete
+# Arguments:
+#   None
+# Returns:
+#   None
+########################################
+main() {
+	shellpress_ascii_display
+	shellpress_check_required
+	shellpress_mysql_setup
+	shellpress_directory_setup
+	shellpress_wordpress_download
+	shellpress_wordpress_database_setup
+	shellpress_wordpress_config_creation
+	shellpress_complete
+}
+
+main
+exit
 
 
 
@@ -464,27 +606,5 @@ $MYSQL_COMMAND --user=$PROJECT_DB_USERNAME --password=$PROJECT_DB_PASSWORD --hos
 
 #TODOS
 
-#create wp-config file from sampe
-#prompt user for values + prefix
-#replace default values with entered values
-#OPTIONAL - get salts from online and replace
-#connect to mamp mysql
-#create database with project name
-
 #copy in any other files
-
-#clean up
-
-
-
-
-
-echo '========================================'
-echo '|           Begining Cleanup           |'
-echo '========================================'
-
-rmdir ./wordpress/
-rm -f latest.tar.gz
-rm salts.txt
-
-echo 'DONE.'
+# themes, plugins, 
