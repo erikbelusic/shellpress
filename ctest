@@ -1,0 +1,13 @@
+#!/bin/bash
+
+function program_is_installed {
+  # set to 1 initially
+  local return_="found"
+  # set to 0 if not found
+  type $1 >/dev/null 2>&1 || { local return_="missing"; }
+  # return value
+  echo "$return_"
+}
+
+curl_installed=$(program_is_installed curl)
+echo ${curl_installed}
